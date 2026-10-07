@@ -77,8 +77,7 @@
   },
   "tsup": {
     "entry": [
-      "index.ts",
-      "src/loader.ts"
+      "index.ts"
     ],
     "outDir": "./build",
     "clean": true,

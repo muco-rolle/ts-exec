@@ -755,4 +755,53 @@ test.group('Loader', (group) => {
 
     assert.equal(result.stdout.trim(), '<button type="submit">Login</button>')
   })
+
+  test('do not emit deprecation warnings when registering hooks', async ({ assert, fs }) => {
+    await fs.create('index.ts', `console.log('hello world' as string)`)
+
+    const result = await spawnPromisified(
+      process.execPath,
+      ['--import', './build/index.js', join(fs.basePath, 'index.ts')],
+      {}
+    )
+
+    assert.equal(result.stdout.trim(), 'hello world')
+    assert.notMatch(result.stderr, /DeprecationWarning/)
+  })
+
+  test('compile typescript files loaded via createRequire', async ({ assert, fs }) => {
+    await fs.createJson('tsconfig.json', {
+      compilerOptions: {
+        rewriteRelativeImportExtensions: true,
+      },
+    })
+
+    await fs.create(
+      'index.ts',
+      `
+      import { createRequire } from 'node:module'
+      const require = createRequire(import.meta.url)
+      const { Role } = require('./role.cts')
+
+      console.log(Role.Admin)
+    `
+    )
+
+    await fs.create(
+      'role.cts',
+      `
+      export enum Role {
+        Admin = 'admin',
+      }
+    `
+    )
+
+    const result = await spawnPromisified(
+      process.execPath,
+      ['--no-warnings', '--import', './build/index.js', join(fs.basePath, 'index.ts')],
+      {}
+    )
+
+    assert.equal(result.stdout.trim(), 'admin')
+  })
 })
