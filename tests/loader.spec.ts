@@ -804,4 +804,61 @@ test.group('Loader', (group) => {
 
     assert.equal(result.stdout.trim(), 'admin')
   })
+
+  test('report typescript source locations in error stacks', async ({ assert, fs }) => {
+    await fs.create(
+      'index.ts',
+      `type User = { id: number }
+
+      const user: User = { id: 1 }
+      throw new Error('failed for ' + user.id)
+    `
+    )
+
+    const result = await spawnPromisified(
+      process.execPath,
+      ['--no-warnings', '--import', './build/index.js', join(fs.basePath, 'index.ts')],
+      {}
+    )
+
+    assert.include(result.stderr, 'Error: failed for 1')
+    assert.include(result.stderr, `${join(fs.basePath, 'index.ts')}:4:13`)
+  })
+
+  test('compile typescript files imported by worker threads', async ({ assert, fs }) => {
+    await fs.createJson('tsconfig.json', {
+      compilerOptions: {
+        rewriteRelativeImportExtensions: false,
+      },
+    })
+
+    await fs.create(
+      'index.ts',
+      `
+      import { Worker } from 'node:worker_threads'
+      const worker = new Worker(new URL('./worker.ts', import.meta.url))
+      worker.on('message', (message: string) => console.log(message))
+    `
+    )
+
+    await fs.create(
+      'worker.ts',
+      `
+      import { parentPort } from 'node:worker_threads'
+      import { greet } from './greet.js'
+      parentPort!.postMessage(greet('worker'))
+    `
+    )
+
+    await fs.create('greet.ts', `export const greet = (name: string): string => 'hello ' + name`)
+
+    const result = await spawnPromisified(
+      process.execPath,
+      ['--no-warnings', '--import', './build/index.js', join(fs.basePath, 'index.ts')],
+      {}
+    )
+
+    assert.equal(result.stderr.trim(), '')
+    assert.equal(result.stdout.trim(), 'hello worker')
+  })
 })
