@@ -143,7 +143,10 @@ export const resolve: ResolveHookSync = (specifier, context, nextResolve) => {
 }
 
 /**
- * Load hook to compile TypeScript and JSX files on the fly
+ * Load hook to compile TypeScript and JSX files on the fly.
+ *
+ * Node.js does not report a format for ".jsx" and ".tsx" files, hence
+ * they are always compiled as ES modules, even when loaded via "require".
  */
 export const load: LoadHookSync = function load(url, context, nextLoad) {
   const { format } = context
